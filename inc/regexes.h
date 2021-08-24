@@ -1,14 +1,14 @@
 
 #ifndef ASSEMBLER_REGEXES_H
 #define ASSEMBLER_REGEXES_H
+
 #include <regex>
 #include <string>
+
 using namespace std;
 
 //D
-regex rxEqu("^\\s*\\.equ\\s+([a-zA-Z_][a-zA-Z_0-9]*)\\s*,\\s*((?:[a-zA-Z_][a-zA-Z_0-9]*|(?:\\+|-)?[0-9]+|(?:0x|0X)[0-9a-fA-F]{1,4})(?:\\s*(?:\\+|-)\\s*(?:[a-zA-Z_][a-zA-Z_0-9]*|[0-9]+|(?:0x|0X)[0-9a-fA-F]{1,4}|\\((?:\\+|-)[0-9]+\\)))*\\s*)\\s*$");
-regex rxEquSimbol("\\s*(\\+|-)?\\s*([a-zA-Z_][a-zA-Z_0-9]*|(?:0x|0X)[0-9a-fA-F]+|[0-9]+|\\((?:\\+|-)[0-9]+\\))\\s*");
-//
+
 //
 //
 regex any_symbol("(.*)");
@@ -24,8 +24,8 @@ regex rx_find_columns_spaces(" ?: ?");
 
 
 // helper strings
-string sh_literal_decimal = "-?[0-9]+";        // this is a decimal number (positive or negative)
-string sh_literal_hexadecimal = "0x[0-9A-F]+"; // this is a hexadecimal number
+string sh_literal_decimal = "-?[1-9][0-9]*";        // PREPRAVLJANEI this is a decimal number (positive or negative)
+string sh_literal_hexadecimal = "0x[0-9A-F]{1,4}"; // PREPRAVLJANEI this is a hexadecimal number
 string sh_symbol = "[a-zA-Z][a-zA-Z0-9_]*";    // symbol can start only with letter and can contain letters, digits and _
 string sh_register_range = "[0-7]";            // there are 8 registers: r0 - r7
 
@@ -49,6 +49,7 @@ regex rx_label_with_command("^(" + sh_symbol + "):(.*)$"); // something is after
 
 // data - symbols and numbers - regexes
 regex rx_symbol("^(" + sh_symbol + ")$");
+regex rxIsLiteral(sh_literal_decimal + "|" + sh_literal_hexadecimal;
 regex rx_literal_decimal("^(" + sh_literal_decimal + ")$");
 regex rx_literal_hexadecimal("^(" + sh_literal_hexadecimal + ")$");
 
@@ -56,7 +57,8 @@ regex rx_literal_hexadecimal("^(" + sh_literal_hexadecimal + ")$");
 // instructions that operate only with registers
 regex rx_no_operand_instruction("^(halt|iret|ret)$");
 regex rx_one_operand_register_instruction("^(push|pop|int|not) (r[0-7]|psw)$");
-regex rx_two_operand_register_instruction("^(xchg|add|sub|mul|div|cmp|and|or|xor|test|shl|shr) (r[0-7]|psw),(r[0-7]|psw)$");
+regex rx_two_operand_register_instruction(
+        "^(xchg|add|sub|mul|div|cmp|and|or|xor|test|shl|shr) (r[0-7]|psw),(r[0-7]|psw)$");
 
 // instructions with operand (all kind)
 // jumps
@@ -70,7 +72,8 @@ regex rx_jmp_address_syntax_notation_memdir("^\\*(" + sh_symbol_or_literal + ")$
 regex rx_jmp_address_syntax_notation_symbol_pc_relative("^%(" + sh_symbol + ")$");
 regex rx_jmp_address_syntax_notation_regdir("^\\*(r[0-7]|psw)$");
 regex rx_jmp_address_syntax_notation_regind("^\\*\\[(r[0-7]|psw)\\]$");
-regex rx_jmp_address_syntax_notation_regind_with_displacement("^\\*\\[(r[0-7]|psw) \\+ (" + sh_symbol_or_literal + ")\\]$");
+regex rx_jmp_address_syntax_notation_regind_with_displacement(
+        "^\\*\\[(r[0-7]|psw) \\+ (" + sh_symbol_or_literal + ")\\]$");
 
 // syntax notation for operand in instruction for load/store
 regex rx_load_store_address_syntax_notation_absolute("^\\$(" + sh_symbol_or_literal + ")$");
@@ -78,7 +81,8 @@ regex rx_load_store_address_syntax_notation_memdir("^(" + sh_symbol_or_literal +
 regex rx_load_store_address_syntax_notation_pc_relative("^%(" + sh_symbol + ")$");
 regex rx_load_store_address_syntax_notation_regdir("^(r[0-7]|psw)$");
 regex rx_load_store_address_syntax_notation_regind("^\\[(r[0-7]|psw)\\]$");
-regex rx_load_store_address_syntax_notation_regind_with_displacement("^\\[(r[0-7]|psw) \\+ (" + sh_symbol_or_literal + ")\\]$");
+regex rx_load_store_address_syntax_notation_regind_with_displacement(
+        "^\\[(r[0-7]|psw) \\+ (" + sh_symbol_or_literal + ")\\]$");
 
 // syntax notation for operand in instruction for load or store
 

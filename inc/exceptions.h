@@ -93,6 +93,12 @@ public:
 
 };
 
+class LiteralError : public std::exception {
+public:
+    virtual const char* what() const noexcept {
+        return "Ocekivan literal, ali nije literal!\n";
+    };
 
+};
 
 #endif //ASSEMBLER_EXCEPTIONS_H

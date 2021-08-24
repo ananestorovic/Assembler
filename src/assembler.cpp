@@ -113,18 +113,12 @@ void Assembler::processEqu(string name, int value) {
 
 }
 
-int Assembler::literalToDecimal(string literal) { //prepravi ovo
-    smatch number;
-    int decimal;
-    if (regex_search(literal, number, rx_literal_decimal))
-        decimal = stoi(number.str(1));
-    else {
-        regex_search(literal, number, rx_literal_hexadecimal);
-        stringstream ss;
-        ss << number.str(1).substr(2);
-        ss >> hex >> decimal;
+int Assembler::literalToDecimal(string literal) {
+    smatch helper;
+    if (regex_match(literal, helper, rxIsLiteral)) {
+        return std::stoi(literal, nullptr, 0);
     }
-    return decimal;
+    throw LiteralError();
 }
 
 bool Assembler::checkIfLabel(string line) {

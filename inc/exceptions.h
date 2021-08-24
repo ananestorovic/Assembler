@@ -24,7 +24,7 @@ public:
 class ExternError : public std::exception {
 public:
     virtual const char* what() const noexcept {
-        return "Ovaj extn simbol vec postoji!\n";
+        return "Ovaj extern simbol vec postoji!\n";
     };
 };
 
@@ -32,6 +32,13 @@ class EquExternError : public std::exception {
 public:
     virtual const char* what() const noexcept {
         return "Ovo je extern simbol i ne sme sa equ!\n";
+    };
+};
+
+class NothingError : public std::exception {
+public:
+    virtual const char* what() const noexcept {
+        return "Pronadjeno je nesto sto nije ni direktiva ni instrukcija!\n";
     };
 };
 

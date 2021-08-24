@@ -1,4 +1,7 @@
 .section ana
 .skip 5
-.equ a, 4
+a:
+.word 4
+.section duca
+.equ b, 4
 .end

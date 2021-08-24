@@ -38,7 +38,7 @@ regex rx_extern_directive("^\\.extern (" + sh_symbol + "(," + sh_symbol + ")*)$"
 regex rx_section_directive("^\\.section (" + sh_symbol + ")$");
 regex rx_word_directive("^\\.word ((" + sh_symbol_or_literal + ")(,(" + sh_symbol_or_literal + "))*)$");
 regex rx_skip_directive("^\\.skip (" + sh_literal_decimal + "|" + sh_literal_hexadecimal + ")$");
-regex rx_equ_directive("^\\.equ (" + sh_symbol + "),(" + sh_literal_decimal + "|" + sh_literal_hexadecimal + ")$");
+regex rx_equ_directive("^\\.equ (" + sh_symbol + "),\\s(" + sh_literal_decimal + "|" + sh_literal_hexadecimal + ")$"); //OVO NE VALJA!!!
 regex rx_end_directive("^\\.end$");
 
 // labels are in form -> 'symbol:'
@@ -49,7 +49,7 @@ regex rx_label_with_command("^(" + sh_symbol + "):(.*)$"); // something is after
 
 // data - symbols and numbers - regexes
 regex rx_symbol("^(" + sh_symbol + ")$");
-regex rxIsLiteral(sh_literal_decimal + "|" + sh_literal_hexadecimal;
+regex rxIsLiteral(sh_literal_decimal + "|" + sh_literal_hexadecimal);
 regex rx_literal_decimal("^(" + sh_literal_decimal + ")$");
 regex rx_literal_hexadecimal("^(" + sh_literal_hexadecimal + ")$");
 

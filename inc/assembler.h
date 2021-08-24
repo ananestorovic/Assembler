@@ -9,6 +9,7 @@
 #include <string>
 #include <memory>
 #include <map>
+
 using namespace std;
 
 class Assembler {
@@ -21,18 +22,17 @@ private:
         int section;
         int value;
         bool isGlobal;
-        bool isDefined;
-        static int id;
+        static int generateId;
         int size;
+        int id;
 
         symbolTableEntry(string symbolName = "", int section = -2, int value = -2, bool isGlobal = false,
-                         bool isDefined = false, int size = 0) {
+                         int size = 0) {
             this->symbolName = symbolName;
             this->section = section;
             this->value = value;
             this->isGlobal = isGlobal;
-            this->isDefined = isDefined;
-            this->id = id++;
+            this->id = generateId++;
             this->size = size;
 
         }
@@ -47,7 +47,7 @@ private:
     };
     static unique_ptr<Assembler> instance;
     string inputFileName;
-    string outputFileName;
+    string outputFileName = "out.o";
     static int locationCounter;
     static string currentSectionName;
     static bool isGlobalFirst;
@@ -62,14 +62,14 @@ public:
 
     explicit Assembler(string inputFileName);
 
-    //pomocne funkcije
+    //pomocne funkcije za direktive
     bool isDirective(string line);
 
     bool checkIfLabel(string line);
 
     bool checkIfLabelIsOk(string labelName);
 
-    void checkWhatIsAfterLabel(string line);
+    bool processAfterLabel(string line);
 
     bool checkIfSection(string line);
 
@@ -87,9 +87,16 @@ public:
 
     int literalToDecimal(string literal);
 
+    //pomocne funkcije za instrukcije
+    bool checkIfNoOperand(string line);
 
-    //prvi prolaz
-    void processInputFileFirstPass(const string &inputFIleName);
+    bool checkIfOneOpReg(string line);
+
+
+    //prvi prolaz za direktive
+    void processInputFile(const string &inputFileName);
+
+    void processInputFile();
 
     void processLabel(string labelName);
 
@@ -103,10 +110,10 @@ public:
 
     void processExtern(string line);
 
-    void processInstructionsFirstPass(string line);
+    bool processInstructions(string line);
 
 
-    //drugi prolaz
+    //drugi prolaz za direktive
     void processInputSecondPass();
 
     void processSectionSecondPass(string line);
@@ -117,6 +124,12 @@ public:
 
     void processGlobalSecondPass(string line);
 
+    //drugi prolaz za instrukcije
+    void processIfNoOperand(string line);
+
+    void processIfOneOpReg(string line);
+
+    void printSymbolTable();
 
     static Assembler &getInstance();
 };

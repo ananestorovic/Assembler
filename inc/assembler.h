@@ -62,8 +62,14 @@ public:
 
     explicit Assembler(string inputFileName);
 
+    void printSymbolTable();
+
+    static Assembler &getInstance();
+
     //pomocne funkcije za direktive
     bool isDirective(string line);
+
+    bool isInstruction(string line);
 
     bool checkIfLabel(string line);
 
@@ -92,6 +98,41 @@ public:
 
     bool checkIfOneOpReg(string line);
 
+    bool checkIfJump(string line); //ako nije neki od ovih dole greska
+
+    bool checkIfJumpAbsolute(string line);
+
+    bool checkIfJumpPcRel(string line);
+
+    bool checkIfJumpRegDir(string line);
+
+    bool checkIfJumpRegInd(string line);
+
+    bool checkIfJumpRegIndDis(string line);
+
+    bool checkIfJumpMemDir(string line);
+
+    bool checkIfLdStr(string line);
+
+    bool checkIfLdStrAbsolute(string line);
+
+    bool checkIfLdStrPcRel(string line);
+
+    bool checkIfLdStrRegDir(string line);
+
+    bool checkIfLdStrRegInd(string line);
+
+    bool checkIfLdStrRegIndDis(string line);
+
+    bool checkIfLdStrMemDir(string line);
+
+    bool checkIfInstrWithTwoReg(string line);
+
+
+
+
+
+
 
     //prvi prolaz za direktive
     void processInputFile(const string &inputFileName);
@@ -110,7 +151,6 @@ public:
 
     void processExtern(string line);
 
-    bool processInstructions(string line);
 
 
     //drugi prolaz za direktive
@@ -129,9 +169,31 @@ public:
 
     void processIfOneOpReg(string line);
 
-    void printSymbolTable();
+    void processJumpAbsolute(string line);
 
-    static Assembler &getInstance();
+    void processJumpPcRel(string basicString);
+
+    void processJumpRegDir(string basicString);
+
+    void processJumpRegInd(string basicString);
+
+    void processJumpRegIndDis(string basicString);
+
+    void processJumpMemDir(string basicString);
+
+    void processLdStrAbsolute(string basicString);
+
+    void processLdStrPcRel(string basicString);
+
+    void processLdStrRegDir(string basicString);
+
+    void processLdStrRegInd(string basicString);
+
+    void processLdStrRegIndDis(string basicString);
+
+    void processLdStrMemDir(string basicString);
+
+    void processInstrWithTwoREg(string basicString);
 };
 
 

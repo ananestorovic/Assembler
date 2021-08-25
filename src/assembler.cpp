@@ -10,6 +10,8 @@
 
 using namespace std;
 
+//ocisti spejsove!!
+
 int Assembler::symbolTableEntry::generateId = 1;
 string Assembler::currentSectionName = "";
 bool Assembler::isGlobalFirst = true;
@@ -39,7 +41,7 @@ void Assembler::processInputFile() {
         while (getline(file, line)) {
             if (isEnd == true) break;
             if (isDirective(line)) continue;
-            //if (processInstructions(line)) continue;
+            if (isInstruction(line)) continue;
 
             printf("%s\n", line.c_str());
             throw NothingError();
@@ -268,23 +270,15 @@ bool Assembler::checkIfEnd(string line) {
     } else return false;
 }
 
-bool Assembler::processInstructions(string line) {
-    smatch instruction;
-    string instructionString;
-    if (regex_match(line, instruction, rx_no_operand_instruction)) {
-        locationCounter += 1;
-        instructionString = instruction.str(1);
-        if (instructionString == "int" || instructionString == "not") locationCounter += 2;
-        if (instructionString == "push" || instructionString == "pop") locationCounter += 3;
+bool Assembler::isInstruction(string line) {
+    if(checkIfNoOperand(line) || checkIfLdStr(line)||
+    checkIfJump(line)|| checkIfInstrWithTwoReg(line) || checkIfOneOpReg(line))
         return true;
-    }
-    if (regex_match(line, instruction, rx_no_operand_instruction)) {
-
-
+    else return false;
     }
 
 
-}
+
 
 Assembler &Assembler::getInstance() {
     return *instance.get();
@@ -313,17 +307,17 @@ void Assembler::processInputSecondPass() {
 bool Assembler::processAfterLabel(string line) {
     if (line.empty()) return true;
     if (checkIfSection(line) || checkIfEnd(line) || checkIfEqu(line) || checkIfExtern(line)
-        || checkIfGlobal(line) || checkIfSkip(line) || checkIfWord(line))
-        //|| processInstructions(line)
+        || checkIfGlobal(line) || checkIfSkip(line) || checkIfWord(line) || isInstruction(line))
         return true;
     return false;
 }
 
-/*bool Assembler::checkIfNoOperand(string line) {
+bool Assembler::checkIfNoOperand(string line) {
     smatch instruction;
     if(regex_match(line, instruction, rx_no_operand_instruction)){
         if (first) { locationCounter += 1; }
         else processIfNoOperand(line);
+        return true;
     }
     return false;
 }
@@ -334,13 +328,13 @@ bool Assembler::checkIfOneOpReg(string line) {
         if (first) {
             string instr=instruction.str(1);
             if(instr=="int"|| instr=="not") locationCounter+=2;
-            else locationCounter+=3; //push i pop
+            if(instr=="pop" || instr=="push") locationCounter+=3;
         }
         else processIfOneOpReg(line);
         return true;
     }
     return false;
-}*/
+}
 
 
 void Assembler::printSymbolTable() {
@@ -364,3 +358,230 @@ void Assembler::printSymbolTable() {
     }
     file << dec;
 }
+
+bool Assembler::checkIfJump(string line) {
+    smatch jump;
+    if(regex_match(line, jump,rx_one_operand_all_kind_addressing_jumps)){
+        //string jmp=jump.str(1);
+        string operand=jump.str(2);
+        if(checkIfJumpAbsolute(operand)|| checkIfJumpMemDir(operand)|| checkIfJumpPcRel(operand)
+            || checkIfJumpRegInd(operand) || checkIfJumpRegDir(operand)|| checkIfJumpRegIndDis(operand))
+            return true;
+        else throw AddressingError();
+    }
+    return false;
+}
+
+bool Assembler::checkIfJumpAbsolute(string line) {
+    smatch jump;
+    if(regex_match(line, jump, rx_jmp_address_syntax_notation_absolute)){
+        if(first) locationCounter+=5;
+        else processJumpAbsolute(line); //ili da prosledim smatch
+        return true;
+    }
+    return false;
+}
+
+bool Assembler::checkIfJumpPcRel(string line) {
+    smatch jump;
+    if(regex_match(line, jump, rx_jmp_address_syntax_notation_symbol_pc_relative)){
+        if(first) locationCounter+=5;
+        else processJumpPcRel(line);
+        return true;
+    }
+    return false;
+}
+
+void Assembler::processJumpPcRel(string basicString) {
+
+}
+
+bool Assembler::checkIfJumpRegDir(string line) {
+    smatch jump;
+    if(regex_match(line, jump, rx_jmp_address_syntax_notation_regdir)){
+        if(first) locationCounter+=3;
+        else processJumpRegDir(line);
+        return true;
+    }
+
+    return false;
+}
+
+void Assembler::processJumpRegDir(string basicString) {
+
+}
+
+bool Assembler::checkIfJumpRegInd(string line) {
+    smatch jump;
+    if(regex_match(line, jump, rx_jmp_address_syntax_notation_regind)){
+        if(first) locationCounter+=3;
+        else processJumpRegInd(line);
+        return true;
+    }
+    return false;
+}
+
+bool Assembler::checkIfJumpRegIndDis(string line) {
+    smatch jump;
+    if(regex_match(line, jump, rx_jmp_address_syntax_notation_regind_with_displacement)){
+        if(first) locationCounter+=5;
+        else processJumpRegIndDis(line);
+        return true;
+    }
+    return false;
+}
+
+bool Assembler::checkIfJumpMemDir(string line) {
+    smatch jump;
+    if(regex_match(line, jump, rx_jmp_address_syntax_notation_memdir)){
+        if(first) locationCounter+=5;
+        else processJumpMemDir(line);
+        return true;
+    }
+    return false;
+}
+
+void Assembler::processJumpRegInd(string basicString) {
+
+}
+
+bool Assembler::checkIfLdStr(string line) {
+    smatch regop;
+    if(regex_match(line, regop, rx_two_operand_all_kind_addressing_load_store)){
+        string operand=regop.str(3);
+        if(checkIfLdStrAbsolute(operand)|| checkIfLdStrMemDir(operand)|| checkIfLdStrPcRel(operand)||
+        checkIfLdStrRegDir(operand)|| checkIfLdStrRegInd(operand) || checkIfLdStrRegIndDis(operand))
+            return true;
+        else throw AddressingError();
+    }
+    return false;
+}
+
+void Assembler::processJumpRegIndDis(string basicString) {
+
+}
+
+void Assembler::processJumpMemDir(string basicString) {
+
+}
+
+bool Assembler::checkIfLdStrAbsolute(string line) {
+    smatch regop;
+    if(regex_match(line, regop, rx_load_store_address_syntax_notation_absolute)){
+        if(first) locationCounter+=5;
+        else processLdStrAbsolute(line);
+        return true;
+    }
+
+    return false;
+}
+
+bool Assembler::checkIfLdStrPcRel(string line) {
+    smatch regop;
+    if(regex_match(line, regop, rx_load_store_address_syntax_notation_pc_relative)){
+        if(first) locationCounter+=5;
+        else processLdStrPcRel(line);
+        return true;
+    }
+
+    return false;
+}
+
+bool Assembler::checkIfLdStrRegDir(string line) {
+    smatch regop;
+    if(regex_match(line, regop, rx_load_store_address_syntax_notation_regdir)){
+        if(first) locationCounter+=3;
+        else processLdStrRegDir(line);
+        return true;
+    }
+
+    return false;
+}
+
+bool Assembler::checkIfLdStrRegInd(string line) {
+    smatch regop;
+    if(regex_match(line, regop, rx_load_store_address_syntax_notation_regind)){
+        if(first) locationCounter+=3;
+        else processLdStrRegInd(line);
+        return true;
+    }
+
+    return false;
+}
+
+bool Assembler::checkIfLdStrRegIndDis(string line) {
+    smatch regop;
+    if(regex_match(line, regop, rx_load_store_address_syntax_notation_regind_with_displacement)){
+        if(first) locationCounter+=5;
+        else processLdStrRegIndDis(line);
+        return true;
+    }
+
+    return false;
+}
+
+void Assembler::processLdStrAbsolute(string basicString) {
+
+}
+
+void Assembler::processLdStrPcRel(string basicString) {
+
+}
+
+void Assembler::processLdStrRegDir(string basicString) {
+
+}
+
+void Assembler::processLdStrRegInd(string basicString) {
+
+}
+
+bool Assembler::checkIfLdStrMemDir(string line) {
+    smatch regop;
+    if(regex_match(line, regop, rx_load_store_address_syntax_notation_memdir)){
+        if(first) locationCounter+=5;
+        else processLdStrMemDir(line);
+        return true;
+    }
+
+    return false;
+}
+
+bool Assembler::checkIfInstrWithTwoReg(string line) {
+    smatch tworeg;
+    if(regex_match(line, tworeg, rx_load_store_address_syntax_notation_absolute)){
+        if(first) locationCounter+=2;
+        else processInstrWithTwoREg(line);
+        return true;
+    }
+    return false;
+}
+
+void Assembler::processLdStrRegIndDis(string basicString) {
+
+}
+
+void Assembler::processLdStrMemDir(string basicString) {
+
+}
+
+void Assembler::processInstrWithTwoREg(string basicString) {
+
+}
+
+void Assembler::processIfNoOperand(string line) {
+
+}
+
+void Assembler::processIfOneOpReg(string line) {
+
+}
+
+void Assembler::processJumpAbsolute(string line) {
+
+}
+
+
+
+
+

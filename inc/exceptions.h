@@ -108,4 +108,14 @@ public:
 
 };
 
+class AddressingError : public std::exception {
+public:
+    virtual const char* what() const noexcept {
+        return "Nije adekvatno adresiranje!\n";
+    };
+
+};
+
+
+
 #endif //ASSEMBLER_EXCEPTIONS_H

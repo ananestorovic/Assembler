@@ -7,8 +7,7 @@
 
 using namespace std;
 
-//D
-
+//moj
 //
 //
 regex any_symbol("(.*)");

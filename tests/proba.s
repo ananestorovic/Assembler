@@ -1,4 +1,5 @@
-.section duca
-.equ b, 4
-
+.section sec
+.skip 5
+.equ b, 5
 .end
+

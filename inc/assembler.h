@@ -9,6 +9,7 @@
 #include <string>
 #include <memory>
 #include <map>
+#include <vector>
 
 using namespace std;
 
@@ -38,13 +39,22 @@ private:
         }
     };
 
-    struct relocationTable { // NE ZNAM STA OVDE TREBA
+
+    struct relocationTableEntry {
         int offset;
         string typeOfRelocation;
-        //bool is_data; // sta znaci da li je instrukcija ili podatak
-        //string section;
-        //int addend;
+        int value;
+        string section;
+
+        relocationTableEntry(int offset = -1, string typeOfRelocation = "", int value = -1, string section="") {
+
+            this->offset = offset;
+            this->typeOfRelocation = typeOfRelocation;
+            this->value = value;
+            this->section=section;
+        }
     };
+
     static unique_ptr<Assembler> instance;
     string inputFileName;
     string outputFileName = "out.o";
@@ -53,8 +63,11 @@ private:
     static bool isGlobalFirst;
     static bool isEnd;
     static bool first;
+    vector<char> bytes;
 
-    map<string, symbolTableEntry> symbolTable; //pretraga po nazivu simbola
+    map<string, symbolTableEntry> symbolTable;
+    map<string, relocationTableEntry> relocationTable;
+    map<string, vector<char> > codeBySection;
 
 
 public:
@@ -129,11 +142,6 @@ public:
     bool checkIfInstrWithTwoReg(string line);
 
 
-
-
-
-
-
     //prvi prolaz za direktive
     void processInputFile(const string &inputFileName);
 
@@ -150,7 +158,6 @@ public:
     void processSkipFirstPass(string line);
 
     void processExtern(string line);
-
 
 
     //drugi prolaz za direktive
@@ -194,6 +201,12 @@ public:
     void processLdStrMemDir(string basicString);
 
     void processInstrWithTwoREg(string basicString);
+
+    string toBinary(int n);
+
+    void processWordHelper(int value);
+
+    void printRelocationTable();
 };
 
 

@@ -30,11 +30,13 @@ void Assembler::processInputFile(const string &inputFileName) {
         this->inputFileName = inputFileName;
         first = true;
         processInputFile();
-        //printSymbolTable();
+
         first = false;
         processInputFile();
+
         printSymbolTable();
-       // printRelocationTable();
+        printRelocationTable();
+        printCodeBySection();
     } catch (const exception &error) {
         cout << error.what();
     }
@@ -53,6 +55,7 @@ void Assembler::processInputFile() {
             printf("%s\n", line.c_str());
             throw NothingError();
         }
+        if (!isEnd) throw NotEnd();
         isEnd = false;
         currentSectionName = "";
         locationCounter = 0;
@@ -75,6 +78,7 @@ bool Assembler::checkIfSection(string line) {
         string name = sectionName.str(1);
         if (first) {
             codeBySection.insert(make_pair(name, bytes));
+            relocationTable.insert(make_pair(name, list<relocationTableEntry>()));
             processSectionFirstPass(name);
             isGlobalFirst = false;
         } else processSectionSecondPass(name);
@@ -143,11 +147,13 @@ bool Assembler::checkIfLabel(string line) {
     if (regex_match(line, label, rx_label_with_command)) {
         labelName = label.str(1);
         command = label.str(2);
-        if (checkIfLabelIsOk(labelName)) {
-            processLabel(labelName);
-            return processAfterLabel(command);
+        if (first) {
+            if (checkIfLabelIsOk(labelName)) {
+                processLabel(labelName);
+                return processAfterLabel(command);
 
-        }
+            }
+        } else return processAfterLabel(command);
     }
     return false;
 }
@@ -271,10 +277,9 @@ bool Assembler::checkIfEnd(string line) {
         if ((currentSectionName != "") && first) {
             symbolTable.find(currentSectionName)->second.size = locationCounter;
         }
-        return true;
         isGlobalFirst = false;
         isEnd = true;
-
+        return true;
     } else return false;
 }
 
@@ -320,15 +325,12 @@ string Assembler::toBinary(int n) {
 
 void Assembler::processWordHelper(int value) {
 
-    string binaryValue = toBinary(value);
-    string highByte = binaryValue.substr(0, 8);
-    string lowByte = binaryValue.substr(8, 16);
-    char hB = (char) literalToDecimal(highByte);
-    char lB = (char) literalToDecimal(lowByte);
-    bytes.push_back(lB);
-    bytes.push_back(hB);
-    codeBySection.insert(make_pair(currentSectionName, bytes));
-    codeBySection.insert(make_pair(currentSectionName, bytes));
+
+    char hB = (((unsigned) value) >> 8) & 0xFF;
+    char lB = ((unsigned) value) & 0xFF;
+
+    codeBySection[currentSectionName].push_back(lB);
+    codeBySection[currentSectionName].push_back(hB);
     return;
 
 }
@@ -336,7 +338,7 @@ void Assembler::processWordHelper(int value) {
 
 void Assembler::processWordSecondPass(string line) { //ja ne znam je l ovo ok
 
-    if (symbolTable.find(line) == symbolTable.end()) throw NotDefWordSecondPassError();
+
 
     smatch literalDecimal;
     smatch literalHex;
@@ -350,6 +352,7 @@ void Assembler::processWordSecondPass(string line) { //ja ne znam je l ovo ok
         return;
     }
     smatch symbol;
+    if (symbolTable.find(line) == symbolTable.end()) throw NotDefWordSecondPassError();
     if (regex_match(line, symbol, rx_symbol)) {
 
         if (symbolTable.find(line) == symbolTable.end()) throw NotDefSymbol();
@@ -367,13 +370,22 @@ void Assembler::processWordSecondPass(string line) { //ja ne znam je l ovo ok
 
             int value = symbolTable.find(line)->second.value;
             processWordHelper(value);
-            locationCounter += 2;
-
             relocationTableEntry rT = relocationTableEntry();
             rT.offset = locationCounter;
-            rT.typeOfRelocation = "R_386_PC32";
+            locationCounter += 2;
+            rT.typeOfRelocation = "R_386_32";
+            rT.value = symbolTable.find(line)->second.section;
+            relocationTable[currentSectionName].push_back(rT);
+            return;
+
+        } else {
+            processWordHelper(0);
+            relocationTableEntry rT = relocationTableEntry();
+            rT.offset = locationCounter;
+            rT.typeOfRelocation = "R_386_32";
             rT.value = symbolTable.find(line)->second.id;
-            relocationTable.insert(make_pair(currentSectionName, rT));
+            relocationTable[currentSectionName].push_back(rT);
+            locationCounter += 2;
             return;
 
         }
@@ -423,7 +435,8 @@ void Assembler::printSymbolTable() {
     file << "Symbol table:" << endl;
     file << "Value\tType\tSection\t\tName\t\tId\t\tSize" << endl;
     for (auto &entry: symbolTable) {
-        file << hex << setfill('0') << setw(8) << (0xffff & entry.second.value) << "\t";
+        file << dec << setfill('0') << setw(8) << entry.second.value << "\t";
+        //file << hex << setfill('0') << setw(8) << (0xffff & entry.second.value) << "\t";
 
         if (entry.second.isGlobal == false)
             file << "l\t";
@@ -436,22 +449,51 @@ void Assembler::printSymbolTable() {
              << setw(8) << (0xffff & entry.second.id) << "\t";
         file << dec << setw(8) << setfill('0') << entry.second.size << endl;
     }
-    file << dec;
+    file << dec << endl;
+
+
 }
+
 
 void Assembler::printRelocationTable() {
 
-    ofstream file(this->outputFileName);
+    ofstream file(this->outputFileName, ios::app);
 
-    file << "Relocation table:" << endl;
-    file << "Offset\t\tType\t\tValue\t\t\t\tSection" << endl;
-    for (auto &entry: relocationTable) {
-        file << hex << setfill('0') << setw(8) << (0xffff & entry.second.offset) << "\t\t";
-        file << entry.second.typeOfRelocation << "\t\t";
-        file << dec << setw(8) << setfill('0') << entry.second.value << "\t\t";
-        file << entry.second.section << endl;
+    file << "Relocation table:" << endl << endl;
+
+    for (const auto &oneSection: relocationTable) {
+        if (oneSection.second.empty()) continue;
+        file << "section name: " << oneSection.first << endl << endl;
+        file << setfill(' ') << setw(8) << "Offset" << "\t\t"
+             << setfill(' ') << setw(8) << "Type" << "\t\t"
+             << setfill(' ') << setw(8) << "Value" << endl;
+        for (const auto &entry: oneSection.second) {
+            file << hex << setfill('0') << setw(8) << (0xffff & entry.offset) << "\t\t";
+            file << setfill('0') << setw(8) << entry.typeOfRelocation << "\t\t";
+            file << dec << setw(8) << setfill('0') << entry.value << "\t\t" << endl << endl;
+        }
     }
-    file << dec;
+    file << dec << endl;
+}
+
+void Assembler::printCodeBySection() {
+    ofstream file(this->outputFileName, ios::app);
+
+    file << "Code:" << endl << endl;
+
+    for (auto &oneSection: codeBySection) {
+        if (oneSection.second.empty()) continue;
+        file << "section name: " << oneSection.first << endl << endl;
+
+        for (const auto &byte: oneSection.second) {
+
+            file << hex << setw(2) << setfill('0') << (((int) byte) & 0xFF) << "\t";
+
+
+        }
+        file << dec << endl << endl;
+
+    }
 }
 
 bool Assembler::checkIfJump(string line) {

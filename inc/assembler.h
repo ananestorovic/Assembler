@@ -10,6 +10,7 @@
 #include <memory>
 #include <map>
 #include <vector>
+#include <list>
 
 using namespace std;
 
@@ -66,7 +67,7 @@ private:
     vector<char> bytes;
 
     map<string, symbolTableEntry> symbolTable;
-    map<string, relocationTableEntry> relocationTable;
+    map<string, list<relocationTableEntry>> relocationTable;
     map<string, vector<char> > codeBySection;
 
 
@@ -207,6 +208,8 @@ public:
     void processWordHelper(int value);
 
     void printRelocationTable();
+
+    void printCodeBySection();
 };
 
 

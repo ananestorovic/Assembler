@@ -149,6 +149,14 @@ public:
 
 };
 
+class NotEnd: public std::exception {
+public:
+    virtual const char *what() const noexcept {
+        return "Ne postoji end u fajlu!\n";
+    };
+
+};
+
 
 
 #endif //ASSEMBLER_EXCEPTIONS_H

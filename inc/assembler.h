@@ -1,7 +1,3 @@
-//
-// Created by ss on 8/20/21.
-//
-
 #ifndef ASSEMBLER_ASSEMBLER_H
 #define ASSEMBLER_ASSEMBLER_H
 
@@ -47,12 +43,12 @@ private:
         int value;
         string section;
 
-        relocationTableEntry(int offset = -1, string typeOfRelocation = "", int value = -1, string section="") {
+        relocationTableEntry(int offset = -1, string typeOfRelocation = "", int value = -1, string section = "") {
 
             this->offset = offset;
             this->typeOfRelocation = typeOfRelocation;
             this->value = value;
-            this->section=section;
+            this->section = section;
         }
     };
 
@@ -64,11 +60,41 @@ private:
     static bool isGlobalFirst;
     static bool isEnd;
     static bool first;
+    static bool previousLabel;
     vector<char> bytes;
 
     map<string, symbolTableEntry> symbolTable;
     map<string, list<relocationTableEntry>> relocationTable;
     map<string, vector<char> > codeBySection;
+    map<string, int> instrDescription = {
+            {"halt", 0x00},
+            {"iret", 0x20},
+            {"ret",  0x40},
+            {"int",  0x10},
+            {"call", 0x30},
+            {"jmp",  0x50},
+            {"jeq",  0x51},
+            {"jne",  0x52},
+            {"jgt",  0x53},
+            {"ldr",  0xA0},
+            {"shr",  0x91},
+            {"str",  0xB0},
+            {"push", 0xB0},
+            {"pop",  0xA0},
+            {"xchg", 0x60},
+            {"add",  0x70},
+            {"sub",  0x71},
+            {"mul",  0x72},
+            {"div",  0x73},
+            {"cmp",  0x74},
+            {"not",  0x80},
+            {"and",  0x81},
+            {"or",   0x82},
+            {"xor",  0x83},
+            {"test", 0x84},
+            {"shl",  0x90}
+
+    };
 
 
 public:
@@ -78,12 +104,21 @@ public:
 
     void printSymbolTable();
 
+    void printRelocationTable();
+
+    void printCodeBySection();
+
     static Assembler &getInstance();
+
+    string  removeSpaces(string & line);
+
 
     //pomocne funkcije za direktive
     bool isDirective(string line);
 
     bool isInstruction(string line);
+
+    bool isComment(string line);
 
     bool checkIfLabel(string line);
 
@@ -114,31 +149,31 @@ public:
 
     bool checkIfJump(string line); //ako nije neki od ovih dole greska
 
-    bool checkIfJumpAbsolute(string line);
+    bool checkIfJumpAbsolute(string instruction, string operand);
 
-    bool checkIfJumpPcRel(string line);
+    bool checkIfJumpPcRel(string instruction, string operand);
 
-    bool checkIfJumpRegDir(string line);
+    bool checkIfJumpRegDir(string instruction, string operand);
 
-    bool checkIfJumpRegInd(string line);
+    bool checkIfJumpRegInd(string instruction, string operand);
 
-    bool checkIfJumpRegIndDis(string line);
+    bool checkIfJumpRegIndDis(string instruction, string operand);
 
-    bool checkIfJumpMemDir(string line);
+    bool checkIfJumpMemDir(string instruction, string operand);
 
     bool checkIfLdStr(string line);
 
-    bool checkIfLdStrAbsolute(string line);
+    bool checkIfLdStrAbsolute(string instruction, int reg, string operand);
 
-    bool checkIfLdStrPcRel(string line);
+    bool checkIfLdStrPcRel(string instruction, int reg, string operand);
 
-    bool checkIfLdStrRegDir(string line);
+    bool checkIfLdStrRegDir(string instruction, int reg, string operand);
 
-    bool checkIfLdStrRegInd(string line);
+    bool checkIfLdStrRegInd(string instruction, int reg, string operand);
 
-    bool checkIfLdStrRegIndDis(string line);
+    bool checkIfLdStrRegIndDis(string instruction, int reg, string operand);
 
-    bool checkIfLdStrMemDir(string line);
+    bool checkIfLdStrMemDir(string instruction, int reg, string operand);
 
     bool checkIfInstrWithTwoReg(string line);
 
@@ -162,8 +197,6 @@ public:
 
 
     //drugi prolaz za direktive
-    void processInputSecondPass();
-
     void processSectionSecondPass(string line);
 
     void processWordSecondPass(string line);
@@ -175,41 +208,46 @@ public:
     //drugi prolaz za instrukcije
     void processIfNoOperand(string line);
 
-    void processIfOneOpReg(string line);
+    void processIfOneOpReg(string line, int reg);
 
-    void processJumpAbsolute(string line);
+    void processJumpAbsolute(string instruction, string operand);
 
-    void processJumpPcRel(string basicString);
+    void processJumpPcRel(string instruction, string operand);
 
-    void processJumpRegDir(string basicString);
+    void processJumpRegDir(string instruction, int reg);
 
-    void processJumpRegInd(string basicString);
+    void processJumpRegInd(string instruction, int reg);
 
-    void processJumpRegIndDis(string basicString);
+    void processJumpRegIndDis(string instruction, int reg, string dis);
 
-    void processJumpMemDir(string basicString);
+    void processJumpMemDir(string instruction, string operand);
 
-    void processLdStrAbsolute(string basicString);
+    void processLdStrAbsolute(string instruction, int reg, string operand);
 
-    void processLdStrPcRel(string basicString);
+    void processLdStrPcRel(string instruction, int reg, string operand);
 
-    void processLdStrRegDir(string basicString);
+    void processLdStrRegDir(string instruction, int reg, string operand);
 
-    void processLdStrRegInd(string basicString);
+    void processLdStrRegInd(string instruction, int reg, string operand);
 
-    void processLdStrRegIndDis(string basicString);
+    void processLdStrRegIndDis(string instruction, int reg, string operand);
 
-    void processLdStrMemDir(string basicString);
+    void processLdStrMemDir(string instruction, int reg, string operand);
 
-    void processInstrWithTwoREg(string basicString);
-
-    string toBinary(int n);
+    void processInstrWithTwoReg(string instruction, int reg);
 
     void processWordHelper(int value);
 
-    void printRelocationTable();
+    void instr2Bytes(string instrDescr, int regsDescr);
 
-    void printCodeBySection();
+    void instr3Bytes(string instrDescr, int regsDescr, int addrMode);
+
+    void instr5Bytes(string instrDescr, int regsDescr, int addrMode, int value);
+
+    int processAbsoluteAddressingSymbol(string line);
+
+    int processPcRelativeAddressingSymbol(string line);
+
 };
 
 

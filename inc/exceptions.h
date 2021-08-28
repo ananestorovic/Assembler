@@ -149,7 +149,7 @@ public:
 
 };
 
-class NotEnd: public std::exception {
+class NotEndError: public std::exception {
 public:
     virtual const char *what() const noexcept {
         return "Ne postoji end u fajlu!\n";
@@ -157,6 +157,13 @@ public:
 
 };
 
+class NothingAfterLabelError: public std::exception {
+public:
+    virtual const char *what() const noexcept {
+        return "Mora da postoji kod nakon labele!\n";
+    };
+
+};
 
 
 #endif //ASSEMBLER_EXCEPTIONS_H

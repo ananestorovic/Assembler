@@ -16,7 +16,6 @@ string Assembler::currentSectionName = "";
 bool Assembler::isGlobalFirst = true;
 bool Assembler::isEnd = false;
 bool Assembler::first = true;
-bool::Assembler::previousLabel = false;
 
 int Assembler::locationCounter = 0;
 unique_ptr<Assembler> Assembler::instance = std::unique_ptr<Assembler>(new Assembler());
@@ -39,13 +38,6 @@ void Assembler::processInputFile(const string &inputFileName) {
     }
 }
 
-bool Assembler::isComment(string line) {
-    smatch comment;
-    if (regex_match(line, comment, commentReg)) {
-        return true;
-    } else return false;
-}
-
 
 void Assembler::processInputFile() {
     ifstream file(this->inputFileName);
@@ -54,11 +46,14 @@ void Assembler::processInputFile() {
         smatch emptyLine;
         while (getline(file, line)) {
             if (isEnd == true) break;
+            if (line.empty()) continue;
             if (isComment(line)) continue;
             if (isDirective(line)) continue;
             if (isInstruction(line)) continue;
-            if (previousLabel && line.empty()) throw NothingAfterLabelError();
+
+            line = removeSpaces(line);
             if (line.empty()) continue;
+
             printf("%s\n", line.c_str());
             throw NothingError();
         }
@@ -79,6 +74,22 @@ bool Assembler::isDirective(string line) {
     else return false;
 }
 
+bool Assembler::isComment(string line) {
+    smatch comment;
+    if (regex_match(line, comment, commentReg)) {
+        return true;
+    } else return false;
+}
+
+bool Assembler::isInstruction(string line) {
+    if (checkIfNoOperand(line) || checkIfLdStr(line) ||
+        checkIfJump(line) || checkIfInstrWithTwoReg(line) || checkIfOneOpReg(line)) {
+        isLabelWithoutCode = false;
+        return true;
+    } else return false;
+}
+
+
 bool Assembler::checkIfSection(string line) {
     smatch sectionName;
     if (regex_match(line, sectionName, sectionDirectiveReg)) {
@@ -88,7 +99,6 @@ bool Assembler::checkIfSection(string line) {
             relocationTable.insert(make_pair(name, list<relocationTableEntry>()));
             processSectionFirstPass(name);
             isGlobalFirst = false;
-            previousLabel = false;
         } else processSectionSecondPass(name);
         return true;
     }
@@ -120,7 +130,6 @@ bool Assembler::checkIfEqu(string line) {
         if (first) {
             name = equParts.str(1);
             valueString = equParts.str(2);
-            previousLabel = false;
             if (symbolTable.find(name) != symbolTable.end()) throw EquDefError();
             isGlobalFirst = false;
             value = literalToDecimal(valueString);
@@ -158,6 +167,7 @@ bool Assembler::checkIfLabel(string line) {
         command = label.str(2);
         if (first) {
             if (checkIfLabelIsOk(labelName)) {
+                isLabelWithoutCode = true;
                 processLabel(labelName);
                 return processAfterLabel(command);
 
@@ -194,7 +204,6 @@ bool Assembler::checkIfWord(string line) {
     string data;
     if (regex_match(line, word, wordDirectiveReg)) {
         if (currentSectionName == "") throw WordSectionError();
-        previousLabel = false;
         data = word.str(1);
         stringstream ss(data);
         while (ss.good()) {
@@ -212,6 +221,7 @@ bool Assembler::checkIfWord(string line) {
 }
 
 void Assembler::processWordFirstPass(string line) {
+    isLabelWithoutCode = false;
     isGlobalFirst = false;
     locationCounter += 2;
 }
@@ -220,7 +230,6 @@ bool Assembler::checkIfSkip(string line) {
     smatch skip;
     string valueString;
     if (regex_match(line, skip, skipDirectiveReg)) {
-        previousLabel = false;
         valueString = skip.str(1);
         if (first) {
             if (currentSectionName == "") throw SkipSectionError();
@@ -233,6 +242,7 @@ bool Assembler::checkIfSkip(string line) {
 
 void Assembler::processSkipFirstPass(string line) {
     isGlobalFirst = false;
+    isLabelWithoutCode = false;
     int value = literalToDecimal(line);
     locationCounter += value;
 }
@@ -241,7 +251,6 @@ bool Assembler::checkIfGlobal(string line) {
     smatch global;
     string globalString;
     if (regex_match(line, global, globalDirectiveReg)) {
-        previousLabel = false;
         if (first) {
             if (!isGlobalFirst) throw GlobalFirstError(); //mora global da bude prvi
             return true;
@@ -264,7 +273,6 @@ bool Assembler::checkIfExtern(string line) {
     smatch externM;
     string externString;
     if (regex_match(line, externM, externDirectiveReg)) {
-        previousLabel = false;
         if (first) {
             isGlobalFirst = false;
             externString = externM.str(1);
@@ -295,20 +303,14 @@ void Assembler::processExtern(string line) {
 bool Assembler::checkIfEnd(string line) {
     smatch end;
     if (regex_match(line, end, endDirectiveReg)) {
-        previousLabel = false;
         if ((currentSectionName != "") && first) {
+
+            if (isLabelWithoutCode) throw NothingAfterLabelError();
+            isLabelWithoutCode = false;
             symbolTable.find(currentSectionName)->second.size = locationCounter;
         }
         isGlobalFirst = false;
         isEnd = true;
-        return true;
-    } else return false;
-}
-
-bool Assembler::isInstruction(string line) {
-    if (checkIfNoOperand(line) || checkIfLdStr(line) ||
-        checkIfJump(line) || checkIfInstrWithTwoReg(line) || checkIfOneOpReg(line)) {
-        previousLabel = false;
         return true;
     } else return false;
 }
@@ -384,7 +386,7 @@ void Assembler::processWordSecondPass(string line) { //ja ne znam je l ovo ok
             relocationTableEntry rT = relocationTableEntry();
             rT.offset = locationCounter;
             locationCounter += 2;
-            rT.typeOfRelocation = "R_386_32";
+            rT.typeOfRelocation = "R_386_16";
             rT.value = symbolTable.find(line)->second.section;
             relocationTable[currentSectionName].push_back(rT);
             return;
@@ -410,7 +412,6 @@ void Assembler::processWordSecondPass(string line) { //ja ne znam je l ovo ok
 
 bool Assembler::processAfterLabel(string line) {
     if (line.empty()) {
-        previousLabel = true;
         return true;
     }
     if (checkIfSection(line) || checkIfEnd(line) || checkIfEqu(line) || checkIfExtern(line)
@@ -490,7 +491,6 @@ void Assembler::printCodeBySection() {
 
 void Assembler::instr2Bytes(string instrDescr, int regsDescr) {
 
-    codeBySection[currentSectionName].push_back(locationCounter);
     codeBySection[currentSectionName].push_back(instrDescription[instrDescr]);
     codeBySection[currentSectionName].push_back(regsDescr);
 
@@ -499,7 +499,7 @@ void Assembler::instr2Bytes(string instrDescr, int regsDescr) {
 
 void Assembler::instr3Bytes(string instrDescr, int regsDescr, int addrMode) {
 
-    codeBySection[currentSectionName].push_back(locationCounter);
+
     codeBySection[currentSectionName].push_back(instrDescription[instrDescr]);
     codeBySection[currentSectionName].push_back(regsDescr);
     codeBySection[currentSectionName].push_back(addrMode);
@@ -509,12 +509,12 @@ void Assembler::instr3Bytes(string instrDescr, int regsDescr, int addrMode) {
 
 void Assembler::instr5Bytes(string instrDescr, int regsDescr, int addrMode, int value) {
 
-    codeBySection[currentSectionName].push_back(locationCounter);
     codeBySection[currentSectionName].push_back(instrDescription[instrDescr]);
     codeBySection[currentSectionName].push_back(regsDescr);
     codeBySection[currentSectionName].push_back(addrMode);
-    codeBySection[currentSectionName].push_back((value >> 8) & 0xff);
     codeBySection[currentSectionName].push_back(value & 0xff);
+    codeBySection[currentSectionName].push_back((value >> 8) & 0xff);
+
 
     return;
 
@@ -528,7 +528,7 @@ int Assembler::processAbsoluteAddressingSymbol(string line) {
         if (symbolTable.find(line)->second.section == -1) return symbolTable.find(line)->second.value;
         else {
             relocationTableEntry rT = relocationTableEntry();
-            rT.offset += locationCounter + 4;
+            rT.offset += locationCounter + 3;
             rT.typeOfRelocation = "R_386_16";
             rT.section = currentSectionName;
 
@@ -551,22 +551,23 @@ int Assembler::processPcRelativeAddressingSymbol(string line) {
     if (symbolTable.find(line) != symbolTable.end()) {
         relocationTableEntry rT = relocationTableEntry();
         if (symbolTable.find(line)->second.section == -1) {
-            rT.offset += locationCounter + 4;
-            rT.typeOfRelocation = "R_386_PC16";
-            rT.section = currentSectionName;
-            rT.value = symbolTable.find(line)->second.id;
-            relocationTable[currentSectionName].push_back(rT);
+            ret = (symbolTable.find(line)->second.value) + ret - (locationCounter + 3);
             return ret;
         } else {
-            rT.offset += locationCounter + 4;
+            rT.offset += locationCounter + 3;
             rT.typeOfRelocation = "R_386_PC16";
             rT.section = currentSectionName;
 
             if (symbolTable.find(line)->second.isGlobal || (symbolTable.find(line)->second.section == 0)) {
+                if (symbolTable.find(line)->second.section == symbolTable.find(currentSectionName)->second.id) {
+                    ret = (symbolTable.find(line)->second.value) + ret - (locationCounter + 3);
+                    return ret;
+                }
+
                 rT.value = symbolTable.find(line)->second.id;
             } else {
                 if (symbolTable.find(line)->second.section == symbolTable.find(currentSectionName)->second.id) {
-                    ret = (symbolTable.find(line)->second.value) + ret - (locationCounter - 3);
+                    ret = (symbolTable.find(line)->second.value) + ret - (locationCounter + 3);
                     return ret;
                 } else {
                     rT.value = symbolTable.find(line)->second.section;
@@ -575,6 +576,7 @@ int Assembler::processPcRelativeAddressingSymbol(string line) {
                 }
             }
             relocationTable[currentSectionName].push_back(rT);
+            return ret;
         }
 
     } else throw NotDefSymbol();
@@ -708,13 +710,10 @@ bool Assembler::checkIfJumpMemDir(string instruction, string operand) {
 
 void Assembler::processIfNoOperand(string instruction) {
     if (instruction == "halt") {
-        codeBySection[currentSectionName].push_back(locationCounter);
         codeBySection[currentSectionName].push_back(instrDescription[instruction]);
     } else if (instruction == "iret") {
-        codeBySection[currentSectionName].push_back(locationCounter);
         codeBySection[currentSectionName].push_back(instrDescription[instruction]);
     } else if (instruction == "ret") {
-        codeBySection[currentSectionName].push_back(locationCounter);
         codeBySection[currentSectionName].push_back(instrDescription[instruction]);
     }
 
@@ -810,7 +809,7 @@ bool Assembler::checkIfLdStr(string line) {
     smatch regop;
     if (regex_match(line, regop, twoOperandInstructionOneRegisterOtherAnyAddrMode)) {
         string instruction = regop.str(1);
-        int regD = literalToDecimal(regop.str(2));
+        int regD = (regop.str(2) == "psw") ? 8 : literalToDecimal(regop.str(2).substr(1));
         regD <<= 4;
         string operand = regop.str(3);
         if (checkIfLdStrAbsolute(instruction, regD, operand) || checkIfLdStrMemDir(instruction, regD, operand) ||
@@ -904,7 +903,7 @@ bool Assembler::checkIfLdStrMemDir(string instruction, int reg, string operand) 
     if (regex_match(operand, regop, dataInstructionMemdirAddrReg)) {
         if (!first) {
             int regs = reg + 0x0F;
-            processLdStrPcRel(instruction, regs, operand);
+            processLdStrMemDir(instruction, regs, operand);
         }
         locationCounter += 5;
         return true;

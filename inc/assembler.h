@@ -13,7 +13,9 @@ using namespace std;
 class Assembler {
 
 private:
-    Assembler() = default;
+    Assembler() {
+        isLabelWithoutCode = false;
+    };
 
     struct symbolTableEntry {
         string symbolName;
@@ -43,7 +45,7 @@ private:
         int value;
         string section;
 
-        relocationTableEntry(int offset = -1, string typeOfRelocation = "", int value = -1, string section = "") {
+        relocationTableEntry(int offset = 0, string typeOfRelocation = "", int value = -1, string section = "") {
 
             this->offset = offset;
             this->typeOfRelocation = typeOfRelocation;
@@ -60,8 +62,8 @@ private:
     static bool isGlobalFirst;
     static bool isEnd;
     static bool first;
-    static bool previousLabel;
     vector<char> bytes;
+    bool isLabelWithoutCode;
 
     map<string, symbolTableEntry> symbolTable;
     map<string, list<relocationTableEntry>> relocationTable;
@@ -110,10 +112,17 @@ public:
 
     static Assembler &getInstance();
 
-    string  removeSpaces(string & line);
+
+    string removeSpaces(string &line);
+
+    int literalToDecimal(string literal);
 
 
-    //pomocne funkcije za direktive
+    void processInputFile(const string &inputFileName);
+
+    void processInputFile();
+
+
     bool isDirective(string line);
 
     bool isInstruction(string line);
@@ -140,14 +149,12 @@ public:
 
     bool checkIfEnd(string line);
 
-    int literalToDecimal(string literal);
 
-    //pomocne funkcije za instrukcije
     bool checkIfNoOperand(string line);
 
     bool checkIfOneOpReg(string line);
 
-    bool checkIfJump(string line); //ako nije neki od ovih dole greska
+    bool checkIfJump(string line);
 
     bool checkIfJumpAbsolute(string instruction, string operand);
 
@@ -178,11 +185,6 @@ public:
     bool checkIfInstrWithTwoReg(string line);
 
 
-    //prvi prolaz za direktive
-    void processInputFile(const string &inputFileName);
-
-    void processInputFile();
-
     void processLabel(string labelName);
 
     void processSectionFirstPass(string line);
@@ -196,7 +198,6 @@ public:
     void processExtern(string line);
 
 
-    //drugi prolaz za direktive
     void processSectionSecondPass(string line);
 
     void processWordSecondPass(string line);
@@ -205,7 +206,20 @@ public:
 
     void processGlobalSecondPass(string line);
 
-    //drugi prolaz za instrukcije
+
+    void processWordHelper(int value);
+
+    void instr2Bytes(string instrDescr, int regsDescr);
+
+    void instr3Bytes(string instrDescr, int regsDescr, int addrMode);
+
+    void instr5Bytes(string instrDescr, int regsDescr, int addrMode, int value);
+
+    int processAbsoluteAddressingSymbol(string line);
+
+    int processPcRelativeAddressingSymbol(string line);
+
+
     void processIfNoOperand(string line);
 
     void processIfOneOpReg(string line, int reg);
@@ -236,17 +250,6 @@ public:
 
     void processInstrWithTwoReg(string instruction, int reg);
 
-    void processWordHelper(int value);
-
-    void instr2Bytes(string instrDescr, int regsDescr);
-
-    void instr3Bytes(string instrDescr, int regsDescr, int addrMode);
-
-    void instr5Bytes(string instrDescr, int regsDescr, int addrMode, int value);
-
-    int processAbsoluteAddressingSymbol(string line);
-
-    int processPcRelativeAddressingSymbol(string line);
 
 };
 

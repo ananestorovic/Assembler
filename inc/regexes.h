@@ -80,11 +80,11 @@ regex twoOperandInstructionBothRegisterReg(
 // instructions with operand (all kind)
 // jumps
 regex jumpInstructionsReg(
-        beginLineRegStr + "(call|jmp|jeq|jne|jgt) " + spacesOrTabsRegStr + "([^ \\t#]*)" + endLineRegStr);
+        beginLineRegStr + "(call|jmp|jeq|jne|jgt) " + spacesOrTabsRegStr + "([^#]*)" + endLineRegStr);
 // load/store
 regex twoOperandInstructionOneRegisterOtherAnyAddrMode(
         beginLineRegStr + "(ldr|str) " + spacesOrTabsRegStr + "(" + registerRegStr + ")" +
-        spacesOrTabsRegStr + "," + spacesOrTabsRegStr + "([^ \\t#]*)" + endLineRegStr);
+        spacesOrTabsRegStr + "," + spacesOrTabsRegStr + "([^#]*)" + endLineRegStr);
 
 
 string registerAddrModeDataRegStr = "(" + registerRegStr + ")";

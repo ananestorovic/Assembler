@@ -104,30 +104,34 @@ public:
 
     explicit Assembler(string inputFileName);
 
-    void printSymbolTable();
-
-    void printRelocationTable();
-
-    void printCodeBySection();
-
-    static Assembler &getInstance();
-
-
-    string removeSpaces(string &line);
-
-    int literalToDecimal(string literal);
-
 
     void processInputFile(const string &inputFileName);
 
     void processInputFile();
 
 
+    static Assembler &getInstance();
+
+
+    void printSymbolTable();
+
+    void printRelocationTable();
+
+    void printCodeBySection();
+
+
+
+    string removeSpaces(string &line);
+
+    int literalToDecimal(string literal);
+
+    bool isComment(string line);
+
+
     bool isDirective(string line);
 
     bool isInstruction(string line);
 
-    bool isComment(string line);
 
     bool checkIfLabel(string line);
 
@@ -207,7 +211,6 @@ public:
     void processGlobalSecondPass(string line);
 
 
-    void processWordHelper(int value);
 
     void instr2Bytes(string instrDescr, int regsDescr);
 
@@ -215,9 +218,12 @@ public:
 
     void instr5Bytes(string instrDescr, int regsDescr, int addrMode, int value);
 
+    void processWordHelper(int value);
+
     int processAbsoluteAddressingSymbol(string line);
 
     int processPcRelativeAddressingSymbol(string line);
+
 
 
     void processIfNoOperand(string line);

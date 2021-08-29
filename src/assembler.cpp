@@ -7,10 +7,6 @@
 using namespace std;
 
 
-//mora neki kod posle labele //labela pa end
-//treba li pisati nesto za nevalidno adresiranje
-
-
 int Assembler::symbolTableEntry::generateId = 1;
 string Assembler::currentSectionName = "";
 bool Assembler::isGlobalFirst = true;
@@ -66,358 +62,8 @@ void Assembler::processInputFile() {
 
 }
 
-bool Assembler::isDirective(string line) {
-    if (checkIfSection(line) || checkIfEnd(line) || checkIfEqu(line) || checkIfExtern(line)
-        || checkIfGlobal(line) || checkIfSkip(line) || checkIfWord(line)
-        || checkIfLabel(line))
-        return true; // proveri posle da li ovde mogu sve funkcije
-    else return false;
-}
-
-bool Assembler::isComment(string line) {
-    smatch comment;
-    if (regex_match(line, comment, commentReg)) {
-        return true;
-    } else return false;
-}
-
-bool Assembler::isInstruction(string line) {
-    if (checkIfNoOperand(line) || checkIfLdStr(line) ||
-        checkIfJump(line) || checkIfInstrWithTwoReg(line) || checkIfOneOpReg(line)) {
-        isLabelWithoutCode = false;
-        return true;
-    } else return false;
-}
-
-
-bool Assembler::checkIfSection(string line) {
-    smatch sectionName;
-    if (regex_match(line, sectionName, sectionDirectiveReg)) {
-        string name = sectionName.str(1);
-        if (first) {
-            codeBySection.insert(make_pair(name, bytes));
-            relocationTable.insert(make_pair(name, list<relocationTableEntry>()));
-            processSectionFirstPass(name);
-            isGlobalFirst = false;
-        } else processSectionSecondPass(name);
-        return true;
-    }
-    return false;
-}
-
-void Assembler::processSectionFirstPass(string line) {
-    if (symbolTable.find(line) != symbolTable.end()) throw SectionError();
-    if (currentSectionName != "") {
-        Assembler::symbolTableEntry &previousSymbol = symbolTable.find(currentSectionName)->second;
-        previousSymbol.size = locationCounter;
-    }
-    locationCounter = 0;
-    Assembler::symbolTableEntry newSymbol = symbolTableEntry();
-    newSymbol.symbolName = line;
-    newSymbol.section = newSymbol.id;
-    newSymbol.value = 0;
-    currentSectionName = newSymbol.symbolName;
-    symbolTable.insert(make_pair(line, newSymbol));
-
-}
-
-bool Assembler::checkIfEqu(string line) {
-    smatch equParts;
-    string name;
-    string valueString;
-    int value;
-    if (regex_match(line, equParts, equDirectiveReg)) {
-        if (first) {
-            name = equParts.str(1);
-            valueString = equParts.str(2);
-            if (symbolTable.find(name) != symbolTable.end()) throw EquDefError();
-            isGlobalFirst = false;
-            value = literalToDecimal(valueString);
-            processEqu(name, value);
-        }
-        return true;
-    }
-    return false;
-}
-
-void Assembler::processEqu(string name, int value) {
-    Assembler::symbolTableEntry newSymbol = symbolTableEntry();
-    newSymbol.value = value;
-    newSymbol.section = -1;
-    newSymbol.symbolName = name;
-    symbolTable.insert(make_pair(name, newSymbol));
-}
-
-
-int Assembler::literalToDecimal(string literal) {
-    smatch helper;
-    if (regex_match(literal, helper, literalReg)) {
-        return std::stoi(literal, nullptr, 0);
-    }
-    throw LiteralError();
-}
-
-bool Assembler::checkIfLabel(string line) {
-    smatch label;
-    string labelName;
-    string command;
-
-    if (regex_match(line, label, labelAndOptionalCommand)) {
-        labelName = label.str(1);
-        command = label.str(2);
-        if (first) {
-            if (checkIfLabelIsOk(labelName)) {
-                isLabelWithoutCode = true;
-                processLabel(labelName);
-                return processAfterLabel(command);
-
-            }
-        } else return processAfterLabel(command);
-    }
-    return false;
-}
-
-bool Assembler::checkIfLabelIsOk(string labelName) {
-    if (symbolTable.find(labelName) != symbolTable.end()) throw LabelDefError();
-    if (currentSectionName == "") throw LabelSectionError();
-    return true;
-}
-
-void Assembler::processLabel(string labelName) {
-    if (first) {
-        isGlobalFirst = false;
-        symbolTableEntry newSymbol = symbolTableEntry();
-        newSymbol.symbolName = labelName;
-        newSymbol.value = locationCounter;
-        newSymbol.section = symbolTable.find(currentSectionName)->second.id;
-        symbolTable.insert(make_pair(labelName, newSymbol));
-    }
-}
-
-string Assembler::removeSpaces(string &line) {
-
-    return regex_replace(line, removeSpaceAndTabsReg, "");
-}
-
-bool Assembler::checkIfWord(string line) {
-    smatch word;
-    string data;
-    if (regex_match(line, word, wordDirectiveReg)) {
-        if (currentSectionName == "") throw WordSectionError();
-        data = word.str(1);
-        stringstream ss(data);
-        while (ss.good()) {
-            string substr;
-            getline(ss, substr, ',');
-            substr = removeSpaces(substr);
-            if (first) processWordFirstPass(substr);
-            else processWordSecondPass(substr);
-        }
-        return true;
-    }
-
-
-    return false;
-}
-
-void Assembler::processWordFirstPass(string line) {
-    isLabelWithoutCode = false;
-    isGlobalFirst = false;
-    locationCounter += 2;
-}
-
-bool Assembler::checkIfSkip(string line) {
-    smatch skip;
-    string valueString;
-    if (regex_match(line, skip, skipDirectiveReg)) {
-        valueString = skip.str(1);
-        if (first) {
-            if (currentSectionName == "") throw SkipSectionError();
-            processSkipFirstPass(valueString);
-        } else processSkipSecondPass(valueString);
-        return true;
-    }
-    return false;
-}
-
-void Assembler::processSkipFirstPass(string line) {
-    isGlobalFirst = false;
-    isLabelWithoutCode = false;
-    int value = literalToDecimal(line);
-    locationCounter += value;
-}
-
-bool Assembler::checkIfGlobal(string line) {
-    smatch global;
-    string globalString;
-    if (regex_match(line, global, globalDirectiveReg)) {
-        if (first) {
-            if (!isGlobalFirst) throw GlobalFirstError(); //mora global da bude prvi
-            return true;
-        } else {
-            globalString = global.str(1);
-            stringstream ss(globalString);
-            while (ss.good()) {
-                string substr;
-                getline(ss, substr, ',');
-                substr = removeSpaces(substr);
-                processGlobalSecondPass(substr);
-            }
-            return true;
-        }
-    }
-    return false;
-}
-
-bool Assembler::checkIfExtern(string line) {
-    smatch externM;
-    string externString;
-    if (regex_match(line, externM, externDirectiveReg)) {
-        if (first) {
-            isGlobalFirst = false;
-            externString = externM.str(1);
-            stringstream ss(externString);
-            while (ss.good()) {
-                string substr;
-                getline(ss, substr, ',');
-                substr = removeSpaces(substr);
-                processExtern(substr);
-            }
-        }
-        return true;
-    }
-    return false;
-}
-
-void Assembler::processExtern(string line) {
-    if (symbolTable.find(line) != symbolTable.end()) throw ExternExistError();
-
-    Assembler::symbolTableEntry newSymbol = symbolTableEntry();
-    newSymbol.isGlobal = true;
-    newSymbol.section = 0; //mora li eksplicitno undefined??
-    newSymbol.symbolName = line;
-    newSymbol.value = 0;
-    symbolTable.insert(make_pair(line, newSymbol));
-}
-
-bool Assembler::checkIfEnd(string line) {
-    smatch end;
-    if (regex_match(line, end, endDirectiveReg)) {
-        if ((currentSectionName != "") && first) {
-
-            if (isLabelWithoutCode) throw NothingAfterLabelError();
-            isLabelWithoutCode = false;
-            symbolTable.find(currentSectionName)->second.size = locationCounter;
-        }
-        isGlobalFirst = false;
-        isEnd = true;
-        return true;
-    } else return false;
-}
-
-
 Assembler &Assembler::getInstance() {
     return *instance.get();
-}
-
-void Assembler::processSectionSecondPass(string line) {
-    locationCounter = 0;
-    currentSectionName = symbolTable.find(line)->second.symbolName;
-}
-
-void Assembler::processSkipSecondPass(string line) {
-    int value = literalToDecimal(line);
-    locationCounter += value;
-    while (value--) {
-        codeBySection.find(currentSectionName)->second.push_back(0);
-    }
-
-}
-
-void Assembler::processGlobalSecondPass(string line) {
-    if (symbolTable.find(line) == symbolTable.end()) throw NotDefGlobalSecondPassError();
-    symbolTable.find(line)->second.isGlobal = true;
-}
-
-void Assembler::processWordHelper(int value) {
-
-
-    char hB = (((unsigned) value) >> 8) & 0xFF;
-    char lB = ((unsigned) value) & 0xFF;
-
-    codeBySection[currentSectionName].push_back(lB);
-    codeBySection[currentSectionName].push_back(hB);
-    return;
-
-}
-
-
-void Assembler::processWordSecondPass(string line) { //ja ne znam je l ovo ok
-
-
-
-    smatch literal;
-    if (regex_match(line, literal, literalReg)) {
-
-        int value = literalToDecimal(line);
-        processWordHelper(value);
-        locationCounter += 2;
-        return;
-    }
-    smatch symbol;
-    if (symbolTable.find(line) == symbolTable.end()) throw NotDefWordSecondPassError();
-    if (regex_match(line, symbol, symbolReg)) {
-
-        if (symbolTable.find(line) == symbolTable.end()) throw NotDefSymbol();
-
-        if (symbolTable.find(line)->second.section == -1) {
-
-            int value = symbolTable.find(line)->second.value;
-            processWordHelper(value);
-            locationCounter += 2;
-            return;
-
-        }
-
-        if (!(symbolTable.find(line)->second.isGlobal)) {
-
-            int value = symbolTable.find(line)->second.value;
-            processWordHelper(value);
-            relocationTableEntry rT = relocationTableEntry();
-            rT.offset = locationCounter;
-            locationCounter += 2;
-            rT.typeOfRelocation = "R_386_16";
-            rT.value = symbolTable.find(line)->second.section;
-            relocationTable[currentSectionName].push_back(rT);
-            return;
-
-        } else {
-            processWordHelper(0);
-            relocationTableEntry rT = relocationTableEntry();
-            rT.offset = locationCounter;
-            rT.typeOfRelocation = "R_386_16";
-            rT.value = symbolTable.find(line)->second.id;
-            relocationTable[currentSectionName].push_back(rT);
-            locationCounter += 2;
-            return;
-
-        }
-    }
-
-    throw AfterWordError();
-
-
-}
-
-
-bool Assembler::processAfterLabel(string line) {
-    if (line.empty()) {
-        return true;
-    }
-    if (checkIfSection(line) || checkIfEnd(line) || checkIfEqu(line) || checkIfExtern(line)
-        || checkIfGlobal(line) || checkIfSkip(line) || checkIfWord(line) || isInstruction(line))
-        return true;
-    return false;
 }
 
 void Assembler::printSymbolTable() {
@@ -487,7 +133,352 @@ void Assembler::printCodeBySection() {
     }
 }
 
-//POMOCNE FUNKCIJE ZA INSTRUKCIJE
+
+string Assembler::removeSpaces(string &line) {
+
+    return regex_replace(line, removeSpaceAndTabsReg, "");
+}
+
+int Assembler::literalToDecimal(string literal) {
+    smatch helper;
+    if (regex_match(literal, helper, literalReg)) {
+        return std::stoi(literal, nullptr, 0);
+    }
+    throw LiteralError();
+}
+
+bool Assembler::isComment(string line) {
+    smatch comment;
+    if (regex_match(line, comment, commentReg)) {
+        return true;
+    } else return false;
+}
+
+
+bool Assembler::isDirective(string line) {
+    if (checkIfSection(line) || checkIfEnd(line) || checkIfEqu(line) || checkIfExtern(line)
+        || checkIfGlobal(line) || checkIfSkip(line) || checkIfWord(line)
+        || checkIfLabel(line))
+        return true;
+    else return false;
+}
+
+
+bool Assembler::isInstruction(string line) {
+    if (checkIfNoOperand(line) || checkIfLdStr(line) ||
+        checkIfJump(line) || checkIfInstrWithTwoReg(line) || checkIfOneOpReg(line)) {
+        isLabelWithoutCode = false;
+        return true;
+    } else return false;
+}
+
+
+bool Assembler::checkIfSection(string line) {
+    smatch sectionName;
+    if (regex_match(line, sectionName, sectionDirectiveReg)) {
+        string name = sectionName.str(1);
+        if (first) {
+            codeBySection.insert(make_pair(name, bytes));
+            relocationTable.insert(make_pair(name, list<relocationTableEntry>()));
+            processSectionFirstPass(name);
+            isGlobalFirst = false;
+        } else processSectionSecondPass(name);
+        return true;
+    }
+    return false;
+}
+
+bool Assembler::checkIfEqu(string line) {
+    smatch equParts;
+    string name;
+    string valueString;
+    int value;
+    if (regex_match(line, equParts, equDirectiveReg)) {
+        if (first) {
+            name = equParts.str(1);
+            valueString = equParts.str(2);
+            if (symbolTable.find(name) != symbolTable.end()) throw EquDefError();
+            isGlobalFirst = false;
+            value = literalToDecimal(valueString);
+            processEqu(name, value);
+        }
+        return true;
+    }
+    return false;
+}
+
+bool Assembler::checkIfLabel(string line) {
+    smatch label;
+    string labelName;
+    string command;
+
+    if (regex_match(line, label, labelAndOptionalCommand)) {
+        labelName = label.str(1);
+        command = label.str(2);
+        if (first) {
+            if (checkIfLabelIsOk(labelName)) {
+                isLabelWithoutCode = true;
+                processLabel(labelName);
+                return processAfterLabel(command);
+
+            }
+        } else return processAfterLabel(command);
+    }
+    return false;
+}
+
+bool Assembler::checkIfLabelIsOk(string labelName) {
+    if (symbolTable.find(labelName) != symbolTable.end()) throw LabelDefError();
+    if (currentSectionName == "") throw LabelSectionError();
+    return true;
+}
+
+bool Assembler::checkIfWord(string line) {
+    smatch word;
+    string data;
+    if (regex_match(line, word, wordDirectiveReg)) {
+        if (currentSectionName == "") throw WordSectionError();
+        data = word.str(1);
+        stringstream ss(data);
+        while (ss.good()) {
+            string substr;
+            getline(ss, substr, ',');
+            substr = removeSpaces(substr);
+            if (first) processWordFirstPass(substr);
+            else processWordSecondPass(substr);
+        }
+        return true;
+    }
+
+
+    return false;
+}
+
+
+bool Assembler::checkIfSkip(string line) {
+    smatch skip;
+    string valueString;
+    if (regex_match(line, skip, skipDirectiveReg)) {
+        valueString = skip.str(1);
+        if (first) {
+            if (currentSectionName == "") throw SkipSectionError();
+            processSkipFirstPass(valueString);
+        } else processSkipSecondPass(valueString);
+        return true;
+    }
+    return false;
+}
+
+bool Assembler::checkIfGlobal(string line) {
+    smatch global;
+    string globalString;
+    if (regex_match(line, global, globalDirectiveReg)) {
+        if (first) {
+            if (!isGlobalFirst) throw GlobalFirstError(); //mora global da bude prvi
+            return true;
+        } else {
+            globalString = global.str(1);
+            stringstream ss(globalString);
+            while (ss.good()) {
+                string substr;
+                getline(ss, substr, ',');
+                substr = removeSpaces(substr);
+                processGlobalSecondPass(substr);
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Assembler::checkIfExtern(string line) {
+    smatch externM;
+    string externString;
+    if (regex_match(line, externM, externDirectiveReg)) {
+        if (first) {
+            isGlobalFirst = false;
+            externString = externM.str(1);
+            stringstream ss(externString);
+            while (ss.good()) {
+                string substr;
+                getline(ss, substr, ',');
+                substr = removeSpaces(substr);
+                processExtern(substr);
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
+bool Assembler::checkIfEnd(string line) {
+    smatch end;
+    if (regex_match(line, end, endDirectiveReg)) {
+        if ((currentSectionName != "") && first) {
+
+            if (isLabelWithoutCode) throw NothingAfterLabelError();
+            isLabelWithoutCode = false;
+            symbolTable.find(currentSectionName)->second.size = locationCounter;
+        }
+        isGlobalFirst = false;
+        isEnd = true;
+        return true;
+    } else return false;
+}
+
+
+void Assembler::processSectionFirstPass(string line) {
+    if (symbolTable.find(line) != symbolTable.end()) throw SectionError();
+    if (currentSectionName != "") {
+        Assembler::symbolTableEntry &previousSymbol = symbolTable.find(currentSectionName)->second;
+        previousSymbol.size = locationCounter;
+    }
+    locationCounter = 0;
+    Assembler::symbolTableEntry newSymbol = symbolTableEntry();
+    newSymbol.symbolName = line;
+    newSymbol.section = newSymbol.id;
+    newSymbol.value = 0;
+    currentSectionName = newSymbol.symbolName;
+    symbolTable.insert(make_pair(line, newSymbol));
+
+}
+
+
+void Assembler::processEqu(string name, int value) {
+    Assembler::symbolTableEntry newSymbol = symbolTableEntry();
+    newSymbol.value = value;
+    newSymbol.section = -1;
+    newSymbol.symbolName = name;
+    symbolTable.insert(make_pair(name, newSymbol));
+}
+
+
+void Assembler::processLabel(string labelName) {
+    if (first) {
+        isGlobalFirst = false;
+        symbolTableEntry newSymbol = symbolTableEntry();
+        newSymbol.symbolName = labelName;
+        newSymbol.value = locationCounter;
+        newSymbol.section = symbolTable.find(currentSectionName)->second.id;
+        symbolTable.insert(make_pair(labelName, newSymbol));
+    }
+}
+
+
+void Assembler::processWordFirstPass(string line) {
+    isLabelWithoutCode = false;
+    isGlobalFirst = false;
+    locationCounter += 2;
+}
+
+
+void Assembler::processSkipFirstPass(string line) {
+    isGlobalFirst = false;
+    isLabelWithoutCode = false;
+    int value = literalToDecimal(line);
+    locationCounter += value;
+}
+
+
+void Assembler::processExtern(string line) {
+    if (symbolTable.find(line) != symbolTable.end()) throw ExternExistError();
+
+    Assembler::symbolTableEntry newSymbol = symbolTableEntry();
+    newSymbol.isGlobal = true;
+    newSymbol.section = 0; //mora li eksplicitno undefined??
+    newSymbol.symbolName = line;
+    newSymbol.value = 0;
+    symbolTable.insert(make_pair(line, newSymbol));
+}
+
+
+void Assembler::processSectionSecondPass(string line) {
+    locationCounter = 0;
+    currentSectionName = symbolTable.find(line)->second.symbolName;
+}
+
+void Assembler::processSkipSecondPass(string line) {
+    int value = literalToDecimal(line);
+    locationCounter += value;
+    while (value--) {
+        codeBySection.find(currentSectionName)->second.push_back(0);
+    }
+
+}
+
+void Assembler::processGlobalSecondPass(string line) {
+    if (symbolTable.find(line) == symbolTable.end()) throw NotDefGlobalSecondPassError();
+    symbolTable.find(line)->second.isGlobal = true;
+}
+
+
+void Assembler::processWordSecondPass(string line) {
+
+
+    smatch literal;
+    if (regex_match(line, literal, literalReg)) {
+
+        int value = literalToDecimal(line);
+        processWordHelper(value);
+        locationCounter += 2;
+        return;
+    }
+    smatch symbol;
+    if (symbolTable.find(line) == symbolTable.end()) throw NotDefWordSecondPassError();
+    if (regex_match(line, symbol, symbolReg)) {
+
+        if (symbolTable.find(line) == symbolTable.end()) throw NotDefSymbol();
+
+        if (symbolTable.find(line)->second.section == -1) {
+
+            int value = symbolTable.find(line)->second.value;
+            processWordHelper(value);
+            locationCounter += 2;
+            return;
+
+        }
+
+        if (!(symbolTable.find(line)->second.isGlobal)) {
+
+            int value = symbolTable.find(line)->second.value;
+            processWordHelper(value);
+            relocationTableEntry rT = relocationTableEntry();
+            rT.offset = locationCounter;
+            locationCounter += 2;
+            rT.typeOfRelocation = "R_386_16";
+            rT.value = symbolTable.find(line)->second.section;
+            relocationTable[currentSectionName].push_back(rT);
+            return;
+
+        } else {
+            processWordHelper(0);
+            relocationTableEntry rT = relocationTableEntry();
+            rT.offset = locationCounter;
+            rT.typeOfRelocation = "R_386_16";
+            rT.value = symbolTable.find(line)->second.id;
+            relocationTable[currentSectionName].push_back(rT);
+            locationCounter += 2;
+            return;
+
+        }
+    }
+
+    throw AfterWordError();
+
+
+}
+
+
+bool Assembler::processAfterLabel(string line) {
+    if (line.empty()) {
+        return true;
+    }
+    if (checkIfSection(line) || checkIfEnd(line) || checkIfEqu(line) || checkIfExtern(line)
+        || checkIfGlobal(line) || checkIfSkip(line) || checkIfWord(line) || isInstruction(line))
+        return true;
+    return false;
+}
+
 
 void Assembler::instr2Bytes(string instrDescr, int regsDescr) {
 
@@ -520,7 +511,17 @@ void Assembler::instr5Bytes(string instrDescr, int regsDescr, int addrMode, int 
 
 }
 
-//proveriti naredne dve i ako je moguce izmeniti
+void Assembler::processWordHelper(int value) {
+
+
+    char hB = (((unsigned) value) >> 8) & 0xFF;
+    char lB = ((unsigned) value) & 0xFF;
+
+    codeBySection[currentSectionName].push_back(lB);
+    codeBySection[currentSectionName].push_back(hB);
+    return;
+
+}
 
 int Assembler::processAbsoluteAddressingSymbol(string line) {
 
@@ -583,7 +584,8 @@ int Assembler::processPcRelativeAddressingSymbol(string line) {
 }
 
 
-//FUNKCIJE ZA INSTRUKCIJE
+
+
 
 bool Assembler::checkIfNoOperand(string line) {
     smatch instruction;
@@ -622,9 +624,10 @@ bool Assembler::checkIfJump(string line) {
     if (regex_match(line, jump, jumpInstructionsReg)) {
         string instruction = jump.str(1);
         string operand = jump.str(2);
-        if (checkIfJumpAbsolute(instruction, operand) || checkIfJumpMemDir(instruction, operand) ||
+        if (checkIfJumpRegDir(instruction, operand) || checkIfJumpAbsolute(instruction, operand) ||
+            checkIfJumpMemDir(instruction, operand) ||
             checkIfJumpPcRel(instruction, operand)
-            || checkIfJumpRegInd(instruction, operand) || checkIfJumpRegDir(instruction, operand) ||
+            || checkIfJumpRegInd(instruction, operand) ||
             checkIfJumpRegIndDis(instruction, operand))
             return true;
         else throw AddressingError();
@@ -812,9 +815,10 @@ bool Assembler::checkIfLdStr(string line) {
         int regD = (regop.str(2) == "psw") ? 8 : literalToDecimal(regop.str(2).substr(1));
         regD <<= 4;
         string operand = regop.str(3);
-        if (checkIfLdStrAbsolute(instruction, regD, operand) || checkIfLdStrMemDir(instruction, regD, operand) ||
+        if (checkIfLdStrRegDir(instruction, regD, operand) || checkIfLdStrAbsolute(instruction, regD, operand) ||
+            checkIfLdStrMemDir(instruction, regD, operand) ||
             checkIfLdStrPcRel(instruction, regD, operand) ||
-            checkIfLdStrRegDir(instruction, regD, operand) || checkIfLdStrRegInd(instruction, regD, operand) ||
+            checkIfLdStrRegInd(instruction, regD, operand) ||
             checkIfLdStrRegIndDis(instruction, regD, operand))
             return true;
         else throw AddressingError();

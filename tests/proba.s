@@ -11,18 +11,19 @@
 
 .section text
 .skip 2
+ldr r4,  %B_value_l
 print_l:
 jmp %another
 .skip 3
 print:
-ldr r4,  %PRINT_REG
-ldr r4,  %another
+jmp  %PRINT_REG
+ldr r4,  %another_l
 ldr r4, r4
 ldr r4,  [r5]
 ldr r4,  %print_l
 push r4
 pop r2
-ldr r4,  %B_value_l
+
 
 
 .section data

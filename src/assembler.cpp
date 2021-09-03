@@ -638,8 +638,8 @@ bool Assembler::checkIfJump(string line) {
 bool Assembler::checkIfJumpAbsolute(string instruction, string operand) {
     smatch jump;
     if (regex_match(operand, jump, jmpInstructionAbsoluteAddrReg)) {
-        if (first) locationCounter += 5;
-        else processJumpAbsolute(instruction, operand);
+        if (!first) processJumpAbsolute(instruction, operand);
+        locationCounter += 5;
         return true;
     }
     return false;
@@ -648,11 +648,11 @@ bool Assembler::checkIfJumpAbsolute(string instruction, string operand) {
 bool Assembler::checkIfJumpPcRel(string instruction, string operand) {
     smatch jump;
     if (regex_match(operand, jump, jmpInstructionPCAddrReg)) {
-        if (first) locationCounter += 5;
-        else {
+        if (!first)  {
             string op = jump.str(1);
             processJumpPcRel(instruction, op);
         }
+        locationCounter+=5;
         return true;
     }
     return false;
@@ -661,11 +661,11 @@ bool Assembler::checkIfJumpPcRel(string instruction, string operand) {
 bool Assembler::checkIfJumpRegDir(string instruction, string operand) {
     smatch jump;
     if (regex_match(operand, jump, jmpInstructionRegisterDirAddrReg)) {
-        if (first) locationCounter += 3;
-        else {
+        if (!first){
             int reg = (jump.str(1) == "psw") ? 8 : jump.str(1).at(1) - '0';
             processJumpRegDir(instruction, reg);
         }
+        locationCounter += 3;
         return true;
     }
 
@@ -675,11 +675,12 @@ bool Assembler::checkIfJumpRegDir(string instruction, string operand) {
 bool Assembler::checkIfJumpRegInd(string instruction, string operand) {
     smatch jump;
     if (regex_match(operand, jump, jmpInstructionRegisterIndAddrReg)) {
-        if (first) locationCounter += 3;
-        else {
+        if (!first)
+        {
             int reg = (jump.str(1) == "psw") ? 8 : jump.str(1).at(1) - '0';
             processJumpRegInd(instruction, reg);
         }
+        locationCounter += 3;
         return true;
     }
     return false;
@@ -688,12 +689,13 @@ bool Assembler::checkIfJumpRegInd(string instruction, string operand) {
 bool Assembler::checkIfJumpRegIndDis(string instruction, string operand) {
     smatch jump;
     if (regex_match(operand, jump, jmpInstructionRegisterIndWithDisplacementsAddrReg)) {
-        if (first) locationCounter += 5;
-        else {
+        if (!first)
+       {
             string dis = jump.str(2);
             int reg = (jump.str(1) == "psw") ? 8 : jump.str(1).at(1) - '0';
             processJumpRegIndDis(instruction, reg, dis);
         }
+        locationCounter += 5;
         return true;
     }
     return false;
@@ -703,9 +705,8 @@ bool Assembler::checkIfJumpMemDir(string instruction, string operand) {
     smatch jump;
     if (regex_match(operand, jump, jmpInstructionMemdirAddrReg)) {
         operand = jump.str(1);
-        if (first) locationCounter += 5;
-        else processJumpMemDir(instruction, operand);
-
+        if (!first) processJumpMemDir(instruction, operand);
+        locationCounter += 5;
         return true;
     }
     return false;

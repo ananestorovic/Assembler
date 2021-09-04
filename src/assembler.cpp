@@ -480,6 +480,11 @@ bool Assembler::processAfterLabel(string line) {
 }
 
 
+
+
+
+
+
 void Assembler::instr2Bytes(string instrDescr, int regsDescr) {
 
     codeBySection[currentSectionName].push_back(instrDescription[instrDescr]);
@@ -549,15 +554,16 @@ int Assembler::processAbsoluteAddressingSymbol(string line) {
 
 int Assembler::processPcRelativeAddressingSymbol(string line) {
     int ret = -2;
+
     if (symbolTable.find(line) != symbolTable.end()) {
         relocationTableEntry rT = relocationTableEntry();
+        rT.offset += locationCounter + 3;
+        rT.typeOfRelocation = "R_386_PC16";
+        rT.section = currentSectionName;
         if (symbolTable.find(line)->second.section == -1) {
+            rT.value = symbolTable.find(line)->second.id;
             ret = (symbolTable.find(line)->second.value) + ret - (locationCounter + 3);
-            return ret;
         } else {
-            rT.offset += locationCounter + 3;
-            rT.typeOfRelocation = "R_386_PC16";
-            rT.section = currentSectionName;
 
             if (symbolTable.find(line)->second.isGlobal || (symbolTable.find(line)->second.section == 0)) {
                 if (symbolTable.find(line)->second.section == symbolTable.find(currentSectionName)->second.id) {
@@ -576,15 +582,13 @@ int Assembler::processPcRelativeAddressingSymbol(string line) {
                     ret += a;
                 }
             }
-            relocationTable[currentSectionName].push_back(rT);
-            return ret;
+
         }
+        relocationTable[currentSectionName].push_back(rT);
+        return ret;
 
     } else throw NotDefSymbol();
 }
-
-
-
 
 
 bool Assembler::checkIfNoOperand(string line) {
@@ -648,11 +652,11 @@ bool Assembler::checkIfJumpAbsolute(string instruction, string operand) {
 bool Assembler::checkIfJumpPcRel(string instruction, string operand) {
     smatch jump;
     if (regex_match(operand, jump, jmpInstructionPCAddrReg)) {
-        if (!first)  {
+        if (!first) {
             string op = jump.str(1);
             processJumpPcRel(instruction, op);
         }
-        locationCounter+=5;
+        locationCounter += 5;
         return true;
     }
     return false;
@@ -661,7 +665,7 @@ bool Assembler::checkIfJumpPcRel(string instruction, string operand) {
 bool Assembler::checkIfJumpRegDir(string instruction, string operand) {
     smatch jump;
     if (regex_match(operand, jump, jmpInstructionRegisterDirAddrReg)) {
-        if (!first){
+        if (!first) {
             int reg = (jump.str(1) == "psw") ? 8 : jump.str(1).at(1) - '0';
             processJumpRegDir(instruction, reg);
         }
@@ -675,8 +679,7 @@ bool Assembler::checkIfJumpRegDir(string instruction, string operand) {
 bool Assembler::checkIfJumpRegInd(string instruction, string operand) {
     smatch jump;
     if (regex_match(operand, jump, jmpInstructionRegisterIndAddrReg)) {
-        if (!first)
-        {
+        if (!first) {
             int reg = (jump.str(1) == "psw") ? 8 : jump.str(1).at(1) - '0';
             processJumpRegInd(instruction, reg);
         }
@@ -689,8 +692,7 @@ bool Assembler::checkIfJumpRegInd(string instruction, string operand) {
 bool Assembler::checkIfJumpRegIndDis(string instruction, string operand) {
     smatch jump;
     if (regex_match(operand, jump, jmpInstructionRegisterIndWithDisplacementsAddrReg)) {
-        if (!first)
-       {
+        if (!first) {
             string dis = jump.str(2);
             int reg = (jump.str(1) == "psw") ? 8 : jump.str(1).at(1) - '0';
             processJumpRegIndDis(instruction, reg, dis);
@@ -710,103 +712,6 @@ bool Assembler::checkIfJumpMemDir(string instruction, string operand) {
         return true;
     }
     return false;
-}
-
-void Assembler::processIfNoOperand(string instruction) {
-    if (instruction == "halt") {
-        codeBySection[currentSectionName].push_back(instrDescription[instruction]);
-    } else if (instruction == "iret") {
-        codeBySection[currentSectionName].push_back(instrDescription[instruction]);
-    } else if (instruction == "ret") {
-        codeBySection[currentSectionName].push_back(instrDescription[instruction]);
-    }
-
-    return;
-
-}
-
-void Assembler::processIfOneOpReg(string line, int reg) {
-    if (line == "int") {
-        codeBySection[currentSectionName].push_back(locationCounter);
-        codeBySection[currentSectionName].push_back(instrDescription[line]);
-        codeBySection[currentSectionName].push_back((reg << 4) + 15);
-
-    } else if (line == "not") {
-        codeBySection[currentSectionName].push_back(locationCounter);
-        codeBySection[currentSectionName].push_back(instrDescription[line]);
-        codeBySection[currentSectionName].push_back((reg << 4) + 15);
-
-    } else if (line == "pop") {
-        codeBySection[currentSectionName].push_back(locationCounter);
-        codeBySection[currentSectionName].push_back(instrDescription[line]);
-        codeBySection[currentSectionName].push_back((reg << 4) + 6);
-        codeBySection[currentSectionName].push_back(literalToDecimal("0x42"));
-
-    } else if (line == "push") {
-        codeBySection[currentSectionName].push_back(locationCounter);
-        codeBySection[currentSectionName].push_back(instrDescription[line]);
-        codeBySection[currentSectionName].push_back((reg << 4) + 6);
-        codeBySection[currentSectionName].push_back(literalToDecimal("0x12"));
-
-    }
-
-    return;
-
-}
-
-void Assembler::processJumpAbsolute(string instruction, string operand) {
-    int reg = 0xFF;
-    int adr = 0;
-    int value;
-    if (regex_match(operand, symbolReg)) value = processAbsoluteAddressingSymbol(operand);
-    else value = literalToDecimal(operand);
-
-    instr5Bytes(instruction, reg, adr, value);
-
-}
-
-void Assembler::processJumpPcRel(string instruction, string operand) {
-    int reg = 0xF7;
-    int adr = 0x05;
-    int value = processPcRelativeAddressingSymbol(operand);
-
-    instr5Bytes(instruction, reg, adr, value);
-    return;
-
-}
-
-void Assembler::processJumpRegDir(string instruction, int reg) {
-    int adr = 0x01;
-
-    instr3Bytes(instruction, reg, adr);
-    return;
-}
-
-void Assembler::processJumpRegInd(string instruction, int reg) {
-    int adr = 0x02;
-
-    instr3Bytes(instruction, reg, adr);
-    return;
-}
-
-void Assembler::processJumpRegIndDis(string instruction, int reg, string dis) {
-    int adr = 0x03;
-    int value = literalToDecimal(dis);
-
-    instr5Bytes(instruction, reg, adr, value);
-    return;
-
-}
-
-void Assembler::processJumpMemDir(string instruction, string operand) {
-    int reg = 0xFF;
-    int adr = 0x04;
-    int value;
-    if (regex_match(operand, symbolReg)) value = processAbsoluteAddressingSymbol(operand);
-    else value = literalToDecimal(operand);
-
-    instr5Bytes(instruction, reg, adr, value);
-
 }
 
 bool Assembler::checkIfLdStr(string line) {
@@ -915,6 +820,103 @@ bool Assembler::checkIfLdStrMemDir(string instruction, int reg, string operand) 
     }
 
     return false;
+}
+
+void Assembler::processIfNoOperand(string instruction) {
+    if (instruction == "halt") {
+        codeBySection[currentSectionName].push_back(instrDescription[instruction]);
+    } else if (instruction == "iret") {
+        codeBySection[currentSectionName].push_back(instrDescription[instruction]);
+    } else if (instruction == "ret") {
+        codeBySection[currentSectionName].push_back(instrDescription[instruction]);
+    }
+
+    return;
+
+}
+
+void Assembler::processIfOneOpReg(string line, int reg) {
+    if (line == "int") {
+        codeBySection[currentSectionName].push_back(locationCounter);
+        codeBySection[currentSectionName].push_back(instrDescription[line]);
+        codeBySection[currentSectionName].push_back((reg << 4) + 15);
+
+    } else if (line == "not") {
+        codeBySection[currentSectionName].push_back(locationCounter);
+        codeBySection[currentSectionName].push_back(instrDescription[line]);
+        codeBySection[currentSectionName].push_back((reg << 4) + 15);
+
+    } else if (line == "pop") {
+        codeBySection[currentSectionName].push_back(locationCounter);
+        codeBySection[currentSectionName].push_back(instrDescription[line]);
+        codeBySection[currentSectionName].push_back((reg << 4) + 6);
+        codeBySection[currentSectionName].push_back(literalToDecimal("0x42"));
+
+    } else if (line == "push") {
+        codeBySection[currentSectionName].push_back(locationCounter);
+        codeBySection[currentSectionName].push_back(instrDescription[line]);
+        codeBySection[currentSectionName].push_back((reg << 4) + 6);
+        codeBySection[currentSectionName].push_back(literalToDecimal("0x12"));
+
+    }
+
+    return;
+
+}
+
+void Assembler::processJumpAbsolute(string instruction, string operand) {
+    int reg = 0xFF;
+    int adr = 0;
+    int value;
+    if (regex_match(operand, symbolReg)) value = processAbsoluteAddressingSymbol(operand);
+    else value = literalToDecimal(operand);
+
+    instr5Bytes(instruction, reg, adr, value);
+
+}
+
+void Assembler::processJumpPcRel(string instruction, string operand) {
+    int reg = 0xF7;
+    int adr = 0x05;
+    int value = processPcRelativeAddressingSymbol(operand);
+
+    instr5Bytes(instruction, reg, adr, value);
+    return;
+
+}
+
+void Assembler::processJumpRegDir(string instruction, int reg) {
+    int adr = 0x01;
+
+    instr3Bytes(instruction, reg, adr);
+    return;
+}
+
+void Assembler::processJumpRegInd(string instruction, int reg) {
+    int adr = 0x02;
+
+    instr3Bytes(instruction, reg, adr);
+    return;
+}
+
+void Assembler::processJumpRegIndDis(string instruction, int reg, string dis) {
+    int adr = 0x03;
+    int value = literalToDecimal(dis);
+
+    instr5Bytes(instruction, reg, adr, value);
+    return;
+
+}
+
+void Assembler::processJumpMemDir(string instruction, string operand) {
+    int reg = 0xFF;
+    int adr = 0x04;
+    int value;
+    if (regex_match(operand, symbolReg)) value = processAbsoluteAddressingSymbol(operand);
+    else value = literalToDecimal(operand);
+
+    instr5Bytes(instruction, reg, adr, value);
+
 }
 
 
